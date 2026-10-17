@@ -20,6 +20,9 @@ Outputs
   data/processed/exclusions_assign.csv
   results/subpocket_map.md                     the lookup table with citation (for the writeup)
 """
+import argparse
+import json
+
 import numpy as np
 import pandas as pd
 
@@ -86,8 +89,17 @@ def assign_structure(pocket):
     return out, None
 
 
-def main():
+def main(allow_partial):
     st = pd.read_parquet(PROC / "structures_main.parquet")
+    # The lookup table must be built from the whole main set. Refuse to run while the pocket pull
+    # is incomplete: structures neither cached nor recorded as failed fetches mean it is still going.
+    failed_f = POCKET_DIR / "_failures.csv"
+    failed = set(pd.read_csv(failed_f)["structure.klifs_id"]) if failed_f.exists() else set()
+    pending = [s for s in st["structure.klifs_id"].astype(int)
+               if not (POCKET_DIR / f"{s}.parquet").exists() and s not in failed]
+    if pending and not allow_partial:
+        raise SystemExit(f"{len(pending)} main-set pockets not yet fetched; finish 03_pull_pockets.py "
+                         "(or pass --allow-partial for a test run, whose outputs are marked partial)")
     excl, parts = [], []
     for _, r in st.iterrows():
         sid = int(r["structure.klifs_id"])
@@ -142,6 +154,12 @@ def main():
         })
     smap = pd.DataFrame(rows)
     smap.to_csv(PROC / "subpocket_map.csv", index=False)
+    meta = {"n_main_set": len(st), "n_assigned": int(n_struct), "n_pending_fetch": len(pending),
+            "partial": bool(pending)}
+    (PROC / "subpocket_map_meta.json").write_text(json.dumps(meta, indent=2))
+    if pending:
+        log.warning("PARTIAL lookup table: built from %d structures with %d pockets still unfetched",
+                    n_struct, len(pending))
     log.info("lookup table sizes:\n%s", smap["subpocket"].value_counts().to_string())
     log.info("unstable positions (modal share < 0.75): %d", (smap["modal_share"] < 0.75).sum())
 
@@ -161,4 +179,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--allow-partial", action="store_true", help="run before the pocket pull finishes (test only)")
+    main(ap.parse_args().allow_partial)

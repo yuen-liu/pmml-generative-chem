@@ -16,6 +16,9 @@ Outputs
   results/kinase_counts.csv             per-kinase structure and observation counts (imbalance)
   data/processed/exclusions_count.csv
 """
+import argparse
+import json
+
 import numpy as np
 import pandas as pd
 
@@ -45,7 +48,14 @@ def to_long(wide, analysis):
     return out
 
 
-def main():
+def main(allow_partial):
+    meta_f = PROC / "subpocket_map_meta.json"
+    if not meta_f.exists():
+        raise SystemExit("no subpocket_map_meta.json; run 04_assign_subpockets.py first")
+    meta = json.loads(meta_f.read_text())
+    if meta["partial"] and not allow_partial:
+        raise SystemExit(f"subpocket_map.csv was built from a partial pocket pull ({meta}); rerun "
+                         "04_assign_subpockets.py after 03_pull_pockets.py finishes")
     main_set = pd.read_parquet(PROC / "structures_main.parquet")
     full = pd.read_parquet(PROC / "structures_full.parquet")
     smap = pd.read_csv(PROC / "subpocket_map.csv").sort_values("klifs_pos")
@@ -123,4 +133,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--allow-partial", action="store_true", help="accept a partial lookup table (test only)")
+    main(ap.parse_args().allow_partial)

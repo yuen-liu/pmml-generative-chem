@@ -84,7 +84,33 @@ def main():
         "max_abs_posterior_mean_shift": shift,
     }).fillna(0).astype({"n_conclusion_flips": int})
     sens.to_csv(RESULTS / "prior_sensitivity.csv")
-    log.info("prior sensitivity:\n%s", sens.to_string())
+    log.info("prior sensitivity (global):\n%s", sens.to_string())
+
+    # Per-cell sensitivity, conditional on the cell count. For n_rv = 0 the posterior mean is
+    # alpha / (V*alpha + N_r): pure prior, and the two priors differ by ~2x when N_r >> V.
+    idx = ["analysis", "region", "interaction", "n", "n_region"]
+    cell = summ.pivot_table(index=idx, columns="prior", values=["post_mean", "cri_hi"])
+    cell.columns = [f"{v}_{p}" for v, p in cell.columns]
+    cell = cell.reset_index()
+    cell["mean_ratio_uniform_over_jeffreys"] = cell["post_mean_uniform"] / cell["post_mean_jeffreys"]
+    cell["mean_abs_diff"] = (cell["post_mean_uniform"] - cell["post_mean_jeffreys"]).abs()
+    cell["cri_hi_ratio_uniform_over_jeffreys"] = cell["cri_hi_uniform"] / cell["cri_hi_jeffreys"]
+    # Share of the posterior's total concentration contributed by the prior. A cell can clear
+    # n >= 10 and still move with the prior if its region's total N_r is small.
+    V = len(INTERACTION_TYPES)
+    for prior, alpha in ALPHAS.items():
+        cell[f"prior_weight_{prior}"] = V * alpha / (V * alpha + cell["n_region"])
+    cell["n_bin"] = pd.cut(cell["n"], [-1, 0, 9, 99, 999, np.inf], labels=["0", "1-9", "10-99", "100-999", ">=1000"])
+    cell.sort_values(["analysis", "n"]).to_csv(RESULTS / "prior_sensitivity_by_cell.csv", index=False)
+    by_bin = cell.groupby(["analysis", "n_bin"], observed=True).agg(
+        n_cells=("n", "size"),
+        median_mean_ratio=("mean_ratio_uniform_over_jeffreys", "median"),
+        max_mean_ratio=("mean_ratio_uniform_over_jeffreys", "max"),
+        max_mean_abs_diff=("mean_abs_diff", "max"),
+        median_cri_hi_ratio=("cri_hi_ratio_uniform_over_jeffreys", "median"))
+    by_bin.to_csv(RESULTS / "prior_sensitivity_by_count.csv")
+    log.info("prior sensitivity by cell count (main):\n%s",
+             by_bin.loc["main"].to_string() if "main" in by_bin.index.get_level_values(0) else by_bin.to_string())
 
 
 if __name__ == "__main__":
