@@ -1,0 +1,23 @@
+# conda env create -f environment.yml
+# opencadd is installed from GitHub without dependencies: its conda-forge/PyPI builds pin
+# biopython<=1.77, which has no osx-arm64 build. Only opencadd.databases.klifs is used.
+# pandas must stay < 3: opencadd's in-place cleanups (e.g. resolution 0 -> NaN) silently fail under pandas 3.
+name: pmml-klifs
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pandas=2.3.3
+  - numpy=2.4.6
+  - pyarrow=25.0.0
+  - matplotlib=3.11.2
+  - rdkit=2026.09.1
+  - bravado
+  - biopandas
+  - requests
+  - tqdm
+  - tabulate
+  - pip
+  - pip:
+      - --no-deps
+      - git+https://github.com/volkamerlab/opencadd.git@57eafc2
