@@ -8,11 +8,11 @@ has more boxes.
 | Activity | # | Anchor number | Source | Status |
 |---|---|---|---|---|
 | Model design | 1 | 49 estimands: 7 regions (6 KinFragLib subpockets + `other` reference) x 7 IFP interaction types | design | fixed |
-| Model design | 2 | 3,635 of 13,325 human KLIFS structures (27%) survive the scope filters + (kinase, ligand) dedup | `exclusions_*.csv` | TBD: minus assignment drops |
-| Posterior inference | 3 | smallest posterior TV distance between two well-populated subpockets, with 95% CrI | `pairwise_tv.csv` | TBD |
-| Model criticism | 4 | share of per-structure residue assignments within 1 A of the runner-up centre | `near_ties.csv` | TBD (~25% in test run) |
-| Model criticism | 5 | the n >= 10 cell whose posterior mean moves most between alpha = 1 and 0.5 | `prior_sensitivity_by_cell.csv` | TBD (see definition) |
-| Model criticism | 6 | posterior predictive overdispersion ratio R across kinases, pooled over the six subpockets (main, alpha = 1), with 95% interval -> revision | `ppc_overdispersion.csv` | TBD |
+| Model design | 2 | 3,635 of 13,325 human KLIFS structures (27%) survive the scope filters + (kinase, ligand) dedup | `exclusions_*.csv` | **3,619 of 13,325 (27.2%)** after 16 assignment drops |
+| Posterior inference | 3 | smallest posterior TV distance between two well-populated subpockets, with 95% CrI | `pairwise_tv.csv` | PENDING: definition needs a null baseline (see below) |
+| Model criticism | 4 | share of per-structure residue assignments within 1 A of the runner-up centre | `near_ties.csv` | **25.4%** of subpocket-labelled assignments (51,804 / 203,858); 21 unstable positions |
+| Model criticism | 5 | the n >= 10 cell whose posterior mean moves most between alpha = 1 and 0.5 | `prior_sensitivity_by_cell.csv` | main max shift 0.001 (< 0.01), so taken from a family subset: **JakA, B1 x apolar, n = 22, N_r = 24: 0.742 -> 0.818**, prior share 0.23 |
+| Model criticism | 6 | posterior predictive overdispersion ratio R across kinases, pooled over the six subpockets (main, alpha = 1), with 95% interval -> revision | `ppc_overdispersion.csv` | **R = 2.73 [2.62, 2.85]**, CrIs ~1.65x too narrow; full (no dedup) set R = 5.57 |
 
 ## Anchor 5: definition fixed before the full run
 
@@ -66,3 +66,15 @@ main-set observations (rule fixed before the full numbers), against the `other` 
 - Sensitivity analyses: per-structure labels, full (no dedup) set, top-3 families, alpha = 0.5
   (one clause under anchor 6 says whether any changes anchor 3)
 - DFG-in filter and B1 sparsity, covalent gap, substrate rule (bullets in criticism notes)
+
+## Full-run notes (2026-10-17)
+
+- Kinases for 50% of main observations: 17 of 227 (CDK2 alone 9.8%). Supporting detail for anchor 6.
+- Dedup DID work, but the evidence is the PPC, not B1's share: R = 5.57 (full) vs 2.73 (main).
+  B1's share is 3.1% in both main and full, so there is no B1 drop.
+- Zero-count cells in main: 6; uniform / Jeffreys mean ratio 1.997-1.9998 (the limit, 2).
+- Anchor 3 issue: TV > 0 by construction, so "CrI clear of zero" tests nothing. Null baseline
+  (two regions sharing one pooled profile, same N): FP-SE observed 0.031 [0.025, 0.037] vs null
+  97.5% 0.013 (naive) / 0.023 (at N/R). AP-B2 0.073 vs 0.016 / 0.027.
+- The figure rule's top four are AP, GA, SE, B2. FP (6,448) missed B2 (6,749) by 301
+  observations, and FP-SE is the closest subpocket pair overall.
