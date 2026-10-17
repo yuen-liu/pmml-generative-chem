@@ -22,7 +22,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from common import (INTERACTION_TYPES, N_RESIDUES, OTHER, PRIOR_DOMINATED_N, PROC, REGIONS, RESULTS, log,
+from common import (ALPHAS, INTERACTION_TYPES, N_RESIDUES, OTHER, PRIOR_DOMINATED_N, PROC, REGIONS, RESULTS, log,
                     write_exclusions)
 
 N_FAMILIES = 3
@@ -112,6 +112,10 @@ def main(allow_partial):
     flagged = wide[INTERACTION_TYPES].apply(
         lambda col: col.map(lambda n: f"{n}*" if n < PRIOR_DOMINATED_N else str(n)))
     flagged["total"] = wide["total"]
+    # Primary prior-dominance diagnostic: prior share of posterior mass, V*alpha / (V*alpha + N_r).
+    V = len(INTERACTION_TYPES)
+    for prior, alpha in ALPHAS.items():
+        flagged[f"prior_share_{prior}"] = (V * alpha / (V * alpha + wide["total"])).round(5)
     flagged["n_cells_lt10"] = wide["n_cells_lt10"]
     flagged.to_csv(RESULTS / "counts_table.csv")
     log.info("counts written; '*' marks cells with n < %d (prior-dominated)", PRIOR_DOMINATED_N)
