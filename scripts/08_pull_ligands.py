@@ -13,8 +13,47 @@ from common import PROC, RAW, Throttle, klifs_session, log
 LIGAND_DIR = RAW / "ligands"
 
 
+def complete_mol2(text):
+    """A mol2 record is complete when the ATOM block holds the atom count the header declares."""
+    try:
+        lines = text.splitlines()
+        i = lines.index("@<TRIPOS>MOLECULE")
+        n_atoms = int(lines[i + 2].split()[0])
+        j = lines.index("@<TRIPOS>ATOM")
+    except (ValueError, IndexError):
+        return False
+    seen = 0
+    for line in lines[j + 1:]:
+        if line.startswith("@<TRIPOS>"):
+            break
+        if line.strip():
+            seen += 1
+    return seen == n_atoms and n_atoms > 0
+
+
+def verify_cache():
+    """Delete cached files that are truncated or unreadable so the next run re-fetches them."""
+    bad = []
+    for f in sorted(LIGAND_DIR.glob("*.mol2")):
+        try:
+            ok = complete_mol2(f.read_text())
+        except OSError:
+            ok = False
+        if not ok:
+            bad.append(f.name)
+            f.unlink()
+    for tmp in LIGAND_DIR.glob(".*.mol2.tmp"):
+        tmp.unlink()
+    if bad:
+        log.warning("removed %d incomplete cached ligand(s), will re-fetch: %s", len(bad), ", ".join(bad))
+    else:
+        log.info("cache verified: every cached ligand file is complete")
+    return bad
+
+
 def main(interval, limit):
     LIGAND_DIR.mkdir(parents=True, exist_ok=True)
+    verify_cache()
     ids = pd.read_parquet(PROC / "structures_main.parquet")["structure.klifs_id"].astype(int).tolist()
     todo = [i for i in ids if not (LIGAND_DIR / f"{i}.mol2").exists()]
     n_cached = len(ids) - len(todo)
@@ -30,7 +69,13 @@ def main(interval, limit):
     for n, sid in enumerate(todo, 1):
         try:
             text = throttle.call(s.coordinates.to_text, sid, entity="ligand", extension="mol2")
-            (LIGAND_DIR / f"{sid}.mol2").write_text(text)
+            if not complete_mol2(text):
+                raise ValueError("response is not a complete mol2 record")
+            # Write atomically: a kill mid-write can never leave a partial file that the next
+            # run would skip as already cached.
+            tmp = LIGAND_DIR / f".{sid}.mol2.tmp"
+            tmp.write_text(text)
+            tmp.replace(LIGAND_DIR / f"{sid}.mol2")
         except Exception as exc:
             failures.append({"structure.klifs_id": sid, "error": f"{type(exc).__name__}: {exc}"[:300]})
             log.warning("ligand %d failed: %s", sid, exc)
@@ -42,6 +87,6 @@ def main(interval, limit):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--interval", type=float, default=1.0, help="seconds between calls")
-    ap.add_argument("--limit", type=int, default=0, help="fetch at most N (for testing)")
+    ap.add_argument("--limit", type=int, default=0, help="fetch at most N (0 = no limit)")
     a = ap.parse_args()
     main(a.interval, a.limit)
