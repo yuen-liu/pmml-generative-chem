@@ -26,13 +26,21 @@ regions at once; it is reported as a sensitivity analysis, not used.
 
 CATEGORIES (4, mutually exclusive by a stated priority rule; first match wins):
     charged    any atom with a non-zero formal charge (KLIFS mol2 carries protonation)
-    hbond      any N or O atom (donor or acceptor capable)
-    aromatic   any aromatic atom (so: aromatic carbocycles, since N/O-containing aromatics
-               match `hbond` first)
+    aromatic   any aromatic atom (includes N-heterocycles: pyridine, aminopyrimidine, ...)
+    hbond      no aromatic atom, but some N or O: the non-aromatic polar residual
+               (amides, ethers, alcohols)
     aliphatic  everything else
 Chemical categories are not naturally exclusive (pyridine is both aromatic and an H-bond
 acceptor); the Dirichlet-Categorical needs exactly one per fragment. The priority rule is a
 design assumption, reported as such alongside the partition assumption.
+
+Ordering revised 2026-10-17: the first version ranked `hbond` above `aromatic`, which sent every
+N-heterocycle (pyridine, pyrimidine, imidazole, aminopyrimidine - the backbone of kinase
+inhibitor chemistry) to `hbond` and left `aromatic` meaning "aromatic carbocycle only". That is a
+construct-validity error: the label did not measure what it named. Aromaticity now outranks mere
+heteroatom presence, because ring aromaticity dominates a fragment's shape and stacking in a
+subpocket while an N or O somewhere does not. Disclose in the writeup as a specification fix, not
+as a response to the observed distribution.
 
 Outputs
   data/processed/fragments.parquet         one row per final fragment
@@ -56,7 +64,7 @@ LIGAND_DIR = RAW / "ligands"
 POCKET_DIR = RAW / "pockets"
 MIN_HEAVY_ATOMS = 3      # KinFragLib fix_small_fragments min_size
 MAX_BRICS_HEAVY = 22     # KinFragLib large-fragment discard
-CATEGORIES = ["charged", "hbond", "aromatic", "aliphatic"]
+CATEGORIES = ["charged", "aromatic", "hbond", "aliphatic"]
 XYZ = ["atom.x", "atom.y", "atom.z"]
 
 
@@ -83,14 +91,14 @@ def components(n_atoms, bonds):
 
 
 def categorise(mol, atom_idx):
-    """First match wins: charged -> hbond -> aromatic -> aliphatic."""
+    """First match wins: charged -> aromatic -> hbond -> aliphatic."""
     atoms = [mol.GetAtomWithIdx(i) for i in atom_idx]
     if any(a.GetFormalCharge() != 0 for a in atoms):
         return "charged"
-    if any(a.GetSymbol() in ("N", "O") for a in atoms):
-        return "hbond"
     if any(a.GetIsAromatic() for a in atoms):
         return "aromatic"
+    if any(a.GetSymbol() in ("N", "O") for a in atoms):
+        return "hbond"
     return "aliphatic"
 
 
