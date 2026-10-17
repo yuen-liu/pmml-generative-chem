@@ -21,7 +21,7 @@ AGC-only structures and will probably not survive the full run. Defined now:
 - Anchor 5 = the `main`-analysis cell with n >= 10 and the largest |posterior-mean shift| between priors.
 - If no main cell shifts by more than 0.01, take it from the family subsets (smaller N_r), and
   say it is a subset.
-- If no cell shifts anywhere, step 5 becomes "the count threshold happens to suffice here", and
+- If no cell shifts anywhere, anchor 5 becomes "the count threshold happens to suffice here", and
   the paragraph shrinks to the prior-share statistic plus the zero-count limit.
 
 Paragraph order: (a) a cell that passes the n >= 10 threshold yet moves with the prior;
