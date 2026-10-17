@@ -10,4 +10,5 @@ $PY scripts/03_pull_pockets.py         # data pull: pocket coordinates for the m
 $PY scripts/04_assign_subpockets.py    # processing (refuses to run on a partial pull): KinFragLib subpocket lookup table, near-ties
 $PY scripts/05_count.py                # processing: region x interaction counts, kinase table
 $PY scripts/06_model.py                # modelling: Dirichlet posteriors, pairwise diffs, prior sensitivity
+$PY scripts/06b_posterior_predictive.py  # criticism: posterior predictive overdispersion check across kinases
 $PY scripts/07_figures.py              # figures: fig1_posteriors

@@ -12,7 +12,7 @@ has more boxes.
 | Posterior inference | 3 | smallest posterior TV distance between two well-populated subpockets, with 95% CrI | `pairwise_tv.csv` | TBD |
 | Model criticism | 4 | share of per-structure residue assignments within 1 A of the runner-up centre | `near_ties.csv` | TBD (~25% in test run) |
 | Model criticism | 5 | the n >= 10 cell whose posterior mean moves most between alpha = 1 and 0.5 | `prior_sensitivity_by_cell.csv` | TBD (see definition) |
-| Model criticism | 6 | number of kinases holding 50% of main-set observations -> revision | `kinase_counts.csv` | TBD |
+| Model criticism | 6 | posterior predictive overdispersion ratio R across kinases, pooled over the six subpockets (main, alpha = 1), with 95% interval -> revision | `ppc_overdispersion.csv` | TBD |
 
 ## Anchor 5: definition fixed before the full run
 
@@ -42,8 +42,14 @@ cells appear in the figure and tables.
    negligible for well-populated regions.
 4. The partition is not well defined at residue level, so phase 1 answers the weaker question
    ("residues nearest different cavity centres"). Phase 2 asks the real one.
-6. Imbalance that dedup doesn't fix; the revision is kinase-level profiles partially pooled
-   toward a global subpocket profile.
+6. The model check. R = observed / replicated multinomial deviance of per-kinase counts,
+   per posterior draw (realized discrepancy; deviance, not Pearson, because of near-zero
+   cells). Calibrated on simulated data: 0.95 [0.88, 1.04] when the model holds; 3.7 and 18
+   under mild and strong kinase-level variation. Reading: the step-3 intervals are too narrow by
+   roughly sqrt(R) (quasi-likelihood approximation; say so). That is the cost of conjugate
+   inference showing up in criticism, and it motivates the revision: kinase-level profiles
+   partially pooled toward a global subpocket profile. Kinases-for-50% of observations
+   (`kinase_counts.csv`) is supporting detail here. No tail probability is reported.
 
 ## Figure
 

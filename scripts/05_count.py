@@ -12,6 +12,7 @@ Analyses (all use the same 7 regions: AP FP SE GA B1 B2 other)
 
 Outputs
   data/processed/counts_long.csv        analysis, region, interaction, n
+  data/processed/counts_by_kinase_long.csv  same, per kinase (main and full; for the PPC)
   results/counts_table.csv              wide table per analysis; cells < 10 flagged prior-dominated
   results/kinase_counts.csv             per-kinase structure and observation counts (imbalance)
   data/processed/exclusions_count.csv
@@ -76,7 +77,17 @@ def main(allow_partial):
     parts = []
     bits_main = decode(main_set["interaction.fingerprint"].tolist())
     parts.append(to_long(count_fixed(bits_main, pos_region), "main"))
-    parts.append(to_long(count_fixed(decode(full["interaction.fingerprint"].tolist()), pos_region), "full"))
+    bits_full = decode(full["interaction.fingerprint"].tolist())
+    parts.append(to_long(count_fixed(bits_full, pos_region), "full"))
+
+    # Per-kinase counts (fixed table), for the posterior predictive overdispersion check.
+    by_kin = []
+    for analysis, bits, df in (("main", bits_main, main_set), ("full", bits_full, full)):
+        kin = df["kinase.klifs_name"].to_numpy()
+        for k in np.unique(kin):
+            w = count_fixed(bits[kin == k], pos_region)
+            by_kin.append(to_long(w, analysis).assign(kinase=k))
+    pd.concat(by_kin, ignore_index=True).to_csv(PROC / "counts_by_kinase_long.csv", index=False)
 
     # Per-structure labels: label matrix (n, 85); positions absent from a structure have no label.
     lab = ra.pivot(index="structure.klifs_id", columns="klifs_pos", values="label")
