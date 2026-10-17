@@ -16,9 +16,18 @@ narrow by roughly sqrt(R) (quasi-likelihood approximation). The distribution of 
 reported; no tail probability is computed.
 
 Anchor: R pooled over the six subpockets (sum of D_obs / sum of D_rep per draw), main analysis,
-alpha = 1. Per-region rows, the full set and Jeffreys are provenance.
+alpha = 1. Per-region rows, the full set, families and Jeffreys are provenance.
+
+Pairwise null baseline (decides anchor 3). TV distance is positive by construction, so a CrI
+"clear of zero" tests nothing. For each pair, the null is the posterior-mean TV of two regions
+that share one profile (the pair's pooled counts), simulated at the observed sizes N_a, N_b and
+at N/R, with R this analysis's pooled overdispersion ratio. N/R as an effective sample size is
+an approximation (quasi-likelihood), not a derivation. Decision rule, fixed before
+looking at pairwise results: a pair is distinguishable if the lower end of its 95% CrI, widened
+about the mean by sqrt(R), lies above the 97.5% point of the N/R null.
 
   results/ppc_overdispersion.csv
+  results/pairwise_tv_null.csv
 """
 import numpy as np
 import pandas as pd
@@ -29,6 +38,7 @@ N_DRAWS = 2_000
 SEED = 1996
 CRI = (0.025, 0.975)
 POOLED = "pooled_subpockets"
+NULL_REPS, NULL_DRAWS = 1000, 400
 
 
 def deviance(X, E):
@@ -66,12 +76,73 @@ def summarize(analysis, prior, region, d_obs, d_rep, n_kin, n_obs):
                 approx_cri_width_inflation=float(np.sqrt(med)), n_valid_draws=len(r))
 
 
+def null_tv(n_a, n_b, n_eff_a, n_eff_b, alpha, rng):
+    """TV posterior means for two regions that truly share one profile (the pair's pooled counts),
+    observed with n_eff_a / n_eff_b observations. Returns the null distribution (NULL_REPS values)."""
+    pi = (n_a + n_b + alpha) / (n_a + n_b + alpha).sum()
+    out = np.empty(NULL_REPS)
+    for i in range(NULL_REPS):
+        xa = rng.multinomial(max(int(n_eff_a), 1), pi)
+        xb = rng.multinomial(max(int(n_eff_b), 1), pi)
+        da = rng.dirichlet(alpha + xa, size=NULL_DRAWS)
+        db = rng.dirichlet(alpha + xb, size=NULL_DRAWS)
+        out[i] = 0.5 * np.abs(da - db).sum(axis=1).mean()
+    return out
+
+
+def pairwise_null(pooled, ppc, rng):
+    """Null baseline and decision rule for every region pair (see module docstring)."""
+    tv = pd.read_csv(RESULTS / "pairwise_tv.csv")
+    rows = []
+    for (analysis, prior), t in tv.groupby(["analysis", "prior"], sort=False):
+        r_row = ppc[(ppc.analysis == analysis) & (ppc.prior == prior) & (ppc.region == POOLED)]
+        if r_row.empty:
+            continue
+        R = float(r_row["ratio_median"].iloc[0])
+        alpha = ALPHAS[prior]
+        cnt = (pooled[pooled.analysis == analysis].pivot(index="region", columns="interaction", values="n")
+               .reindex(index=REGIONS, columns=INTERACTION_TYPES).fillna(0).to_numpy())
+        for _, p in t.iterrows():
+            n_a, n_b = cnt[REGIONS.index(p.region_a)], cnt[REGIONS.index(p.region_b)]
+            naive = null_tv(n_a, n_b, n_a.sum(), n_b.sum(), alpha, rng)
+            eff = null_tv(n_a, n_b, n_a.sum() / R, n_b.sum() / R, alpha, rng)
+            s = np.sqrt(R)
+            lo_infl = p.tv_mean - s * (p.tv_mean - p.cri_lo)
+            hi_infl = p.tv_mean + s * (p.cri_hi - p.tv_mean)
+            null_q = float(np.quantile(eff, 0.975))
+            rows.append(dict(
+                analysis=analysis, prior=prior, region_a=p.region_a, region_b=p.region_b,
+                both_subpockets=p.region_a in SUBPOCKETS and p.region_b in SUBPOCKETS,
+                n_a=int(n_a.sum()), n_b=int(n_b.sum()), R=R,
+                tv_mean=p.tv_mean, cri_lo=p.cri_lo, cri_hi=p.cri_hi,
+                cri_lo_inflated=lo_infl, cri_hi_inflated=hi_infl,
+                null_median=float(np.median(naive)), null_q975=float(np.quantile(naive, 0.975)),
+                null_eff_median=float(np.median(eff)), null_eff_q975=null_q,
+                distinguishable=bool(lo_infl > null_q)))
+        log.info("null TV %s/%s done (R = %.2f)", analysis, prior, R)
+    out = pd.DataFrame(rows)
+    out.to_csv(RESULTS / "pairwise_tv_null.csv", index=False)
+    m = out[(out.analysis == "main") & (out.prior == "uniform") & out.both_subpockets].sort_values("tv_mean")
+    log.info("subpocket pairs, main, alpha = 1 (%d of %d distinguishable):\n%s",
+             m.distinguishable.sum(), len(m),
+             m[["region_a", "region_b", "tv_mean", "cri_lo_inflated", "null_eff_q975", "distinguishable"]]
+             .round(3).to_string(index=False))
+
+
 def main():
     pooled = pd.read_csv(PROC / "counts_long.csv")
     by_kin = pd.read_csv(PROC / "counts_by_kinase_long.csv")
+    fam_of = (pd.read_parquet(PROC / "structures_main.parquet")
+              .drop_duplicates("kinase.klifs_name").set_index("kinase.klifs_name")["kinase.family"])
     rng = np.random.default_rng(SEED)
     rows = []
-    for analysis in ("main", "full"):
+    families = [a for a in pooled["analysis"].unique() if a.startswith("family:")]
+    for analysis in ["main", "full"] + families:
+        if analysis.startswith("family:"):
+            fam = analysis.split(":", 1)[1]
+            kin_rows = by_kin[(by_kin.analysis == "main") & by_kin.kinase.map(fam_of).eq(fam)]
+        else:
+            kin_rows = by_kin[by_kin.analysis == analysis]
         for prior, alpha in ALPHAS.items():
             tot_obs = np.zeros(N_DRAWS)
             tot_rep = np.zeros(N_DRAWS)
@@ -79,7 +150,7 @@ def main():
             for region in REGIONS:
                 n_r = (pooled[(pooled.analysis == analysis) & (pooled.region == region)]
                        .set_index("interaction")["n"].reindex(INTERACTION_TYPES).fillna(0).to_numpy())
-                X = (by_kin[(by_kin.analysis == analysis) & (by_kin.region == region)]
+                X = (kin_rows[kin_rows.region == region]
                      .pivot(index="kinase", columns="interaction", values="n")
                      .reindex(columns=INTERACTION_TYPES).fillna(0).to_numpy())
                 res = region_ratios(X, n_r, alpha, rng)
@@ -101,6 +172,7 @@ def main():
     log.info("overdispersion ratio, main, alpha = 1:\n%s",
              a[["region", "n_kinases", "n_obs", "ratio_median", "ratio_cri_lo", "ratio_cri_hi",
                 "approx_cri_width_inflation"]].to_string(index=False))
+    pairwise_null(pooled, out, rng)
 
 
 if __name__ == "__main__":

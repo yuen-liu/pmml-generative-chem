@@ -9,7 +9,7 @@ has more boxes.
 |---|---|---|---|---|
 | Model design | 1 | 49 estimands: 7 regions (6 KinFragLib subpockets + `other` reference) x 7 IFP interaction types | design | fixed |
 | Model design | 2 | 3,635 of 13,325 human KLIFS structures (27%) survive the scope filters + (kinase, ligand) dedup | `exclusions_*.csv` | **3,619 of 13,325 (27.2%)** after 16 assignment drops |
-| Posterior inference | 3 | smallest posterior TV distance between two well-populated subpockets, with 95% CrI | `pairwise_tv.csv` | PENDING: definition needs a null baseline (see below) |
+| Posterior inference | 3 | pairwise subpocket distinguishability vs a same-profile null at N/R (all six subpockets: all have prior share < 1%) | `pairwise_tv_null.csv` | **14 of 15 subpocket pairs distinguishable; FP-SE is not: TV 0.031, widened lower bound 0.021 vs N/R null 0.023** (same verdict at alpha = 0.5) |
 | Model criticism | 4 | share of per-structure residue assignments within 1 A of the runner-up centre | `near_ties.csv` | **25.4%** of subpocket-labelled assignments (51,804 / 203,858); 21 unstable positions |
 | Model criticism | 5 | the n >= 10 cell whose posterior mean moves most between alpha = 1 and 0.5 | `prior_sensitivity_by_cell.csv` | main max shift 0.001 (< 0.01), so taken from a family subset: **JakA, B1 x apolar, n = 22, N_r = 24: 0.742 -> 0.818**, prior share 0.23 |
 | Model criticism | 6 | posterior predictive overdispersion ratio R across kinases, pooled over the six subpockets (main, alpha = 1), with 95% interval -> revision | `ppc_overdispersion.csv` | **R = 2.73 [2.62, 2.85]**, CrIs ~1.65x too narrow; full (no dedup) set R = 5.57 |
@@ -78,3 +78,38 @@ main-set observations (rule fixed before the full numbers), against the `other` 
   97.5% 0.013 (naive) / 0.023 (at N/R). AP-B2 0.073 vs 0.016 / 0.027.
 - The figure rule's top four are AP, GA, SE, B2. FP (6,448) missed B2 (6,749) by 301
   observations, and FP-SE is the closest subpocket pair overall.
+
+## Anchor 3 (decided 2026-10-17)
+
+Population: all six subpockets. The prior-share rule decides it (every subpocket's prior share is
+< 1%). The figure's "top four" is a display choice, not the anchor population.
+
+Rule (in `06b_posterior_predictive.py`, fixed before pairwise results were inspected): a pair is
+distinguishable if the lower end of its 95% CrI, widened about the mean by sqrt(R), lies above
+the 97.5% point of the null TV for two regions sharing the pair's pooled profile, simulated at
+N/R. Say in one clause that N/R as an effective sample size is an approximation (quasi-likelihood).
+
+Result: 14 of 15 pairs distinguishable under both priors. FP-SE is not: TV 0.031 [0.025, 0.037],
+widened lower bound 0.021 vs null 0.023 (alpha = 1) / 0.024 (alpha = 0.5); 1,000 null replicates.
+The margin is narrow. At 200 replicates the Jeffreys run passed, which was Monte Carlo noise.
+Undeduplicated set: FP-SE passes (0.025 vs 0.021); it has more observations, even after dividing by the larger R.
+
+Families (state as separate observations, NOT corroboration): with 10-30x fewer observations,
+FP-SE is not distinguishable in MAPK or JakA but is in CDK. Those subsets fail several other pairs
+too (MAPK: FP-SE, FP-GA, FP-B1, SE-GA; JakA: 10 of 15), so they are underpowered and don't single
+FP-SE out. Drop the earlier "within MAPK, SE-GA is similarly marginal" line: under the formal rule
+MAPK fails FP-SE itself, plus three others.
+
+External check (qualitative): in KinFragLib's own fragment statistics, FP and SE have the two
+lowest median fragment logP of the six subpockets (v1.0.0: FP 0.73, SE 0.99; next lowest B1 1.16;
+`notebooks/2_2_fragment_analysis_statistics.ipynb`, cell 126; current master: 0.78, 1.01).
+Caveats to state: (i) a different quantity on different objects (fragment lipophilicity vs residue
+IFP types), so it supports SIMILARITY of FP and SE only, not the direction of any difference;
+(ii) medians with SD ~1.2-1.3, no intervals; (iii) looked up after the FP-SE result, so it is a
+post-hoc plausibility check. Our profiles agree on similarity: apolar share 0.895 (FP) vs 0.893 (SE).
+They are not identical: SE has protein-anion : ligand-cation contacts at 0.017 vs 0.001 in FP
+(consistent with basic solubilising groups at the solvent front).
+
+Headline: all subpocket pairs are distinguishable except FP-SE, which fails narrowly once
+overdispersion is accounted for, and FP and SE are also the two subpockets whose fragments
+KinFragLib found least lipophilic.
