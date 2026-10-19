@@ -1,0 +1,6 @@
+analysis,n_pairwise_comparisons,n_conclusion_flips,max_abs_posterior_mean_shift
+family:CDK,84,4,0.05727554179566563
+family:JakA,84,6,0.07435897435897443
+family:MAPK,84,0,0.06666666666666665
+main,84,1,0.005417630969913767
+main_min_atom,84,0,0.009000400017778576

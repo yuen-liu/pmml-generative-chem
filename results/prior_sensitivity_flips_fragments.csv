@@ -1,0 +1,12 @@
+analysis,region_a,region_b,interaction,jeffreys,uniform,either_prior_dominated
+family:CDK,AP,B1,aromatic,0.0,1.0,False
+family:CDK,GA,B1,hbond,1.0,0.0,True
+family:CDK,GA,B2,hbond,1.0,0.0,True
+family:CDK,SE,other,aliphatic,1.0,0.0,True
+family:JakA,AP,B1,aliphatic,0.0,1.0,True
+family:JakA,AP,B1,charged,0.0,1.0,True
+family:JakA,AP,GA,aromatic,0.0,1.0,False
+family:JakA,GA,B1,aromatic,0.0,1.0,True
+family:JakA,SE,B2,hbond,1.0,0.0,True
+family:JakA,SE,GA,aromatic,1.0,0.0,False
+main,AP,B1,charged,0.0,1.0,True

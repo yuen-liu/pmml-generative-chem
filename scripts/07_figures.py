@@ -35,6 +35,7 @@ N_PROFILE_REGIONS = 4
 PRIOR_SHARE_FLAG = 0.01
 LOG_FLOOR = 1e-5  # values below are drawn at the floor (zero-count cells reach ~3e-5)
 INTERACTION_TYPES, INTERACTION_LABELS, SFX, COUNTS_FILE = [], {}, "", ""
+LOG_X = True  # log x-axis in panel (b); set per phase (IFP spans 1e-4..0.9, fragments do not)
 SHORT_IFP = {
     "apolar": "Apolar",
     "aromatic_face_to_face": "Arom. face-face",
@@ -48,8 +49,9 @@ SHORT_IFP = {
 
 def set_phase(phase):
     """Bind the vocabulary, labels and output suffix for this phase (module-level, read by panels)."""
-    global INTERACTION_TYPES, INTERACTION_LABELS, SHORT, SFX, COUNTS_FILE
+    global INTERACTION_TYPES, INTERACTION_LABELS, SHORT, SFX, COUNTS_FILE, LOG_X
     cfg = PHASES[phase]
+    LOG_X = phase == "ifp"
     INTERACTION_TYPES, INTERACTION_LABELS, SFX = cfg["vocab"], cfg["labels"], cfg["suffix"]
     COUNTS_FILE = cfg["counts"]
     SHORT = SHORT_IFP if phase == "ifp" else dict(cfg["labels"])
@@ -129,11 +131,15 @@ def panel_profiles(axes, g, q, mean):
             small = g.loc[r, it] < PRIOR_DOMINATED_N
             ax.plot(max(mean[r][k], LOG_FLOOR), k, "o", ms=4, mec=SERIES, mew=1,
                     mfc=SURFACE if small else SERIES, zorder=3)
-        ax.set_xscale("log")
-        ax.set_xlim(LOG_FLOOR / 2, 2.0)
-        ax.set_xticks([1e-4, 1e-1], ["10⁻⁴", "10⁻¹"], fontsize=6)
-        ax.set_xticks([1e-5, 1e-3, 1e-2, 1], minor=True)
-        ax.tick_params(axis="x", which="minor", length=1.5, labelbottom=False)
+        if LOG_X:
+            ax.set_xscale("log")
+            ax.set_xlim(LOG_FLOOR / 2, 2.0)
+            ax.set_xticks([1e-4, 1e-1], ["10⁻⁴", "10⁻¹"], fontsize=6)
+            ax.set_xticks([1e-5, 1e-3, 1e-2, 1], minor=True)
+            ax.tick_params(axis="x", which="minor", length=1.5, labelbottom=False)
+        else:
+            ax.set_xlim(0, 1)
+            ax.set_xticks([0, 0.5, 1], ["0", "0.5", "1"], fontsize=6)
         ax.set_ylim(len(INTERACTION_TYPES) - 0.5, -0.5)
         ax.set_yticks(y, [SHORT[it] for it in INTERACTION_TYPES] if c == 0 else [])
         ax.grid(axis="x", which="major", color=GRID, lw=0.5, zorder=0)
@@ -145,7 +151,8 @@ def panel_profiles(axes, g, q, mean):
     axes[0].text(0, 1.13, f"(b) Profiles, {N_PROFILE_REGIONS} best-populated subpockets",
                  transform=axes[0].transAxes, fontsize=7.5, color=INK, ha="left", va="bottom")
     fig = axes[0].figure
-    fig.text(0.985, 0.02, "posterior proportion (log; values < 10⁻⁵ drawn at 10⁻⁵)   "
+    scale_note = "log; values < 10⁻⁵ drawn at 10⁻⁵" if LOG_X else "linear"
+    fig.text(0.985, 0.02, f"posterior proportion ({scale_note})   "
              "● mean, 50% / 95% CrI   ○ n < 10   ▮ 'other' reference, 95% CrI",
              ha="right", va="bottom", fontsize=5.3, color=INK_2)
     return top

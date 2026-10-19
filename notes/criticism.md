@@ -70,3 +70,55 @@ mixes dedup with a shift in kinase mix (dedup removes most from the most-crystal
   partially pooled toward a global subpocket profile.
 - `other` is a mixture of heterogeneous positions: a reference distribution, not a seventh
   subpocket.
+
+---
+
+# Phase 2 (fragments) — full run, 2026-10-18
+
+Scope: 10,141 BRICS fragments from 3,424 ligands, 214 kinases. Exclusions: 139 ligands with a
+BRICS fragment > 22 heavy atoms (KinFragLib rule), 56 unparsable mol2, 14 missing anchor
+residues, 2 un-fetched (KLIFS 2776, 2777).
+
+## 1. The decomposition is partly a property of the metric
+
+Centroid-to-subpocket-centre: 12.0% of fragments within 1 A of a runner-up.
+Minimum atom-to-residue (the original spec's rule): 88.6% near-ties, and it agrees with the
+centroid rule on only 54.1% of fragments. A fragment inside the cavity is at contact distance
+from residues lining several regions at once, so that rule barely discriminates.
+With phase 1's 25.4% residue-level near-ties, this says the subpocket decomposition is partly a
+property of the metric, not only of the pocket — an argument FOR learning subpockets as latents.
+
+## 2. Merge accounting
+
+46.8% of BRICS fragments were tiny (< 3 heavy atoms), but only 8.0% were relabelled and those
+held just 2.5% of heavy atoms. The merge moved little chemistry. Median final fragment: 9 heavy
+atoms; 0.3% still below 3.
+
+## 3. Result: 10 of 15 subpocket pairs distinguishable (vs 14/15 in phase 1)
+
+Same rule as phase 1 (sqrt(R)-widened CrI lower bound vs the 97.5% point of the same-profile
+null at N/R; R = 2.44 [2.31, 2.58], so intervals are ~1.56x too narrow). Identical verdict at
+alpha = 0.5. Every AP and FP pair separates; the five failures all involve B1 (192 fragments) or
+B2 (299), whose nulls are large because counts are small. Not a null result.
+
+FP-SE flips between phases: the one failure in phase 1 (IFP), clearly distinguishable in phase 2
+(TV 0.123, widened lower bound 0.084 vs null 0.060). The two subpockets' protein-side interaction
+patterns are alike while their fragment chemistry differs, which is worth a sentence.
+
+## 4. Category distribution and what drives the result
+
+aromatic 68.4%, charged 14.2%, hbond 12.4%, aliphatic 5.0%. AP is 95.3% aromatic (the
+hinge-binding heteroaromatics); FP and SE carry the charged fragments (0.226 / 0.252 vs 0.017 in
+AP) — solubilising amines at the solvent front. Chemically recognisable, which is the point of
+the revised priority ordering.
+
+## 5. Overdispersion is lower than phase 1 but still real
+
+R = 2.44 (fragments) vs 2.73 (IFP, deduplicated). Same conclusion: the independence assumption
+fails and the hierarchical revision is motivated. 17 of 214 kinases hold 50% of fragments.
+
+## 6. B1/B2 remain the sparse regions
+
+B1: 192 fragments, prior share 2.0%; B2: 299. The DFG-in filter is still the likely cause
+(type-II ligands reach the back pocket). Phase 2 has ~10x less data per region than phase 1,
+so this bites harder here.
