@@ -10,3 +10,4 @@ $PY scripts/10_count_fragments.py                      # processing: region x ca
 $PY scripts/06_model.py --phase fragment               # modelling: Dirichlet posteriors, TV, prior sensitivity
 $PY scripts/06b_posterior_predictive.py --phase fragment  # criticism: overdispersion + pairwise null
 $PY scripts/07_figures.py --phase fragment             # figures: fig1_posteriors_fragments
+$PY scripts/11_fig_main.py                             # figures: fig1_main (primary; reads both phases)
