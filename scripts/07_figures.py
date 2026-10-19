@@ -21,7 +21,7 @@ import pandas as pd  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 from matplotlib.gridspec import GridSpec  # noqa: E402
 
-from common import (ALPHAS, FIGS, INTERACTION_LABELS, INTERACTION_TYPES, OTHER, PRIOR_DOMINATED_N, PROC,  # noqa: E402
+from common import (ALPHAS, FIGS, OTHER, PHASES, PRIOR_DOMINATED_N, PROC,  # noqa: E402
                     REGIONS, RESULTS, SUBPOCKETS, log)
 
 INK, INK_2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
@@ -34,7 +34,8 @@ N_DRAWS, SEED = 40_000, 7
 N_PROFILE_REGIONS = 4
 PRIOR_SHARE_FLAG = 0.01
 LOG_FLOOR = 1e-5  # values below are drawn at the floor (zero-count cells reach ~3e-5)
-SHORT = {
+INTERACTION_TYPES, INTERACTION_LABELS, SFX, COUNTS_FILE = [], {}, "", ""
+SHORT_IFP = {
     "apolar": "Apolar",
     "aromatic_face_to_face": "Arom. face-face",
     "aromatic_edge_to_face": "Arom. edge-face",
@@ -43,6 +44,15 @@ SHORT = {
     "cation_protein_anion_ligand": "Prot. cation : lig. anion",
     "anion_protein_cation_ligand": "Prot. anion : lig. cation",
 }
+
+
+def set_phase(phase):
+    """Bind the vocabulary, labels and output suffix for this phase (module-level, read by panels)."""
+    global INTERACTION_TYPES, INTERACTION_LABELS, SHORT, SFX, COUNTS_FILE
+    cfg = PHASES[phase]
+    INTERACTION_TYPES, INTERACTION_LABELS, SFX = cfg["vocab"], cfg["labels"], cfg["suffix"]
+    COUNTS_FILE = cfg["counts"]
+    SHORT = SHORT_IFP if phase == "ifp" else dict(cfg["labels"])
 
 
 def style():
@@ -54,7 +64,7 @@ def style():
 
 def load(analysis, prior):
     alpha = ALPHAS[prior]
-    long = pd.read_csv(PROC / "counts_long.csv")
+    long = pd.read_csv(PROC / COUNTS_FILE)
     g = long[long.analysis == analysis].pivot(index="region", columns="interaction", values="n")
     g = g.reindex(index=REGIONS, columns=INTERACTION_TYPES).fillna(0).astype(int)
     rng = np.random.default_rng(SEED)
@@ -72,7 +82,7 @@ def save(fig, stem):
 
 
 def panel_tv(ax, analysis, prior, g, alpha):
-    tv = pd.read_csv(RESULTS / "pairwise_tv.csv")
+    tv = pd.read_csv(RESULTS / f"pairwise_tv{SFX}.csv")
     tv = tv[(tv.analysis == analysis) & (tv.prior == prior)]
     V = len(INTERACTION_TYPES)
     share = {r: V * alpha / (V * alpha + g.loc[r].sum()) for r in REGIONS}
@@ -150,8 +160,8 @@ def fig1(analysis, prior):
     panel_tv(fig.add_subplot(gs[0, 0]), analysis, prior, g, alpha)
     sub = GridSpec(1, N_PROFILE_REGIONS, figure=fig, left=0.59, right=0.985, top=0.84, bottom=0.12, wspace=0.18)
     top = panel_profiles([fig.add_subplot(sub[0, c]) for c in range(N_PROFILE_REGIONS)], g, q, mean)
-    stem = "fig1_posteriors" if (analysis, prior) == ("main", "uniform") else \
-        f"fig1_posteriors_{analysis.replace(':', '_')}_{prior}"
+    stem = f"fig1_posteriors{SFX}" if (analysis, prior) == ("main", "uniform") else \
+        f"fig1_posteriors{SFX}_{analysis.replace(':', '_')}_{prior}"
     save(fig, stem)
     log.info("panel (b) subpockets (most observations): %s", top)
 
@@ -196,14 +206,16 @@ def figS1(analysis, prior):
     key.set_xlim(0, 1)
     key.set_ylim(0, 1)
     fig.tight_layout(w_pad=0.8, h_pad=1.0)
-    save(fig, "figS1_posteriors_by_type" if (analysis, prior) == ("main", "uniform") else
-         f"figS1_posteriors_by_type_{analysis.replace(':', '_')}_{prior}")
+    save(fig, f"figS1_posteriors_by_type{SFX}" if (analysis, prior) == ("main", "uniform") else
+         f"figS1_posteriors_by_type{SFX}_{analysis.replace(':', '_')}_{prior}")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--analysis", default="main")
     ap.add_argument("--prior", default="uniform", choices=list(ALPHAS))
+    ap.add_argument("--phase", default="ifp", choices=list(PHASES))
     a = ap.parse_args()
+    set_phase(a.phase)
     fig1(a.analysis, a.prior)
     figS1(a.analysis, a.prior)

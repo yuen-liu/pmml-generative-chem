@@ -62,6 +62,27 @@ NEAR_TIE_MARGIN_A = 1.0
 ALPHAS = {"uniform": 1.0, "jeffreys": 0.5}
 PRIOR_DOMINATED_N = 10
 
+# Phase 2 fragment categories: mutually exclusive by priority, first match wins.
+# See 09_fragment_assign.py for the definitions and the ordering's rationale.
+FRAGMENT_CATEGORIES = ["charged", "aromatic", "hbond", "aliphatic"]
+FRAGMENT_LABELS = {
+    "charged": "Charged",
+    "aromatic": "Aromatic",
+    "hbond": "Polar, non-aromatic",
+    "aliphatic": "Aliphatic",
+}
+
+# The two analyses share the Dirichlet-Categorical machinery (06, 06b, 07) and differ only in
+# their observation unit and category vocabulary. `--phase` selects one.
+PHASES = {
+    "ifp": dict(vocab=INTERACTION_TYPES, labels=INTERACTION_LABELS,
+                counts="counts_long.csv", by_kinase="counts_by_kinase_long.csv",
+                suffix="", unit="IFP interaction"),
+    "fragment": dict(vocab=FRAGMENT_CATEGORIES, labels=FRAGMENT_LABELS,
+                     counts="counts_fragments_long.csv", by_kinase="counts_fragments_by_kinase_long.csv",
+                     suffix="_fragments", unit="BRICS fragment"),
+}
+
 
 class Throttle:
     """Minimum wall-clock spacing between calls to klifs.net (a public academic server)."""

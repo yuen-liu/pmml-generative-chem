@@ -55,8 +55,8 @@ import pandas as pd
 from rdkit import Chem, RDLogger
 from rdkit.Chem import BRICS
 
-from common import (NEAR_TIE_MARGIN_A, OTHER, OTHER_CUTOFF_A, PROC, RAW, REGIONS, SUBPOCKETS, log,
-                    write_exclusions)
+from common import (FRAGMENT_CATEGORIES as CATEGORIES, NEAR_TIE_MARGIN_A, OTHER, OTHER_CUTOFF_A, PROC,
+                    RAW, REGIONS, SUBPOCKETS, log, write_exclusions)
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -64,7 +64,6 @@ LIGAND_DIR = RAW / "ligands"
 POCKET_DIR = RAW / "pockets"
 MIN_HEAVY_ATOMS = 3      # KinFragLib fix_small_fragments min_size
 MAX_BRICS_HEAVY = 22     # KinFragLib large-fragment discard
-CATEGORIES = ["charged", "aromatic", "hbond", "aliphatic"]
 XYZ = ["atom.x", "atom.y", "atom.z"]
 
 

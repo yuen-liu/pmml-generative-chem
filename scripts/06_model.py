@@ -13,12 +13,13 @@ Outputs (results/)
   pairwise_tv.csv         total-variation distance 0.5 * sum_v |pi_a,v - pi_b,v|: mean, 95% CrI
   prior_sensitivity.csv   per analysis: decision flips and max shift between the two priors
 """
+import argparse
 from itertools import combinations
 
 import numpy as np
 import pandas as pd
 
-from common import ALPHAS, INTERACTION_TYPES, PRIOR_DOMINATED_N, PROC, REGIONS, RESULTS, log
+from common import ALPHAS, PHASES, PRIOR_DOMINATED_N, PROC, REGIONS, RESULTS, log
 
 N_DRAWS = 40_000
 SEED = 20261017
@@ -30,8 +31,10 @@ def posterior_draws(counts, alpha, rng):
     return {r: rng.dirichlet(alpha + np.asarray(n, float), size=N_DRAWS) for r, n in counts.items()}
 
 
-def main():
-    long = pd.read_csv(PROC / "counts_long.csv")
+def main(phase):
+    cfg = PHASES[phase]
+    INTERACTION_TYPES, sfx = cfg["vocab"], cfg["suffix"]
+    long = pd.read_csv(PROC / cfg["counts"])
     rng = np.random.default_rng(SEED)
     summ, diffs, tvs = [], [], []
     for analysis, g in long.groupby("analysis", sort=False):
@@ -66,16 +69,16 @@ def main():
         log.info("modelled %s", analysis)
 
     summ, diffs, tvs = pd.DataFrame(summ), pd.DataFrame(diffs), pd.DataFrame(tvs)
-    summ.to_csv(RESULTS / "posterior_summary.csv", index=False)
-    diffs.to_csv(RESULTS / "pairwise_diffs.csv", index=False)
-    tvs.to_csv(RESULTS / "pairwise_tv.csv", index=False)
+    summ.to_csv(RESULTS / f"posterior_summary{sfx}.csv", index=False)
+    diffs.to_csv(RESULTS / f"pairwise_diffs{sfx}.csv", index=False)
+    tvs.to_csv(RESULTS / f"pairwise_tv{sfx}.csv", index=False)
 
     # Prior sensitivity: do any "CrI excludes 0" conclusions change between alpha = 1 and 0.5?
     key = ["analysis", "region_a", "region_b", "interaction"]
     w = diffs.pivot_table(index=key, columns="prior", values="cri_excludes_0").reset_index()
     flips = w[w["uniform"] != w["jeffreys"]]
     flips.merge(diffs[diffs.prior == "uniform"][key + ["either_prior_dominated"]], on=key).to_csv(
-        RESULTS / "prior_sensitivity_flips.csv", index=False)
+        RESULTS / f"prior_sensitivity_flips{sfx}.csv", index=False)
     pm = summ.pivot_table(index=["analysis", "region", "interaction"], columns="prior", values="post_mean")
     shift = (pm["uniform"] - pm["jeffreys"]).abs().groupby(level="analysis").max()
     sens = pd.DataFrame({
@@ -83,7 +86,7 @@ def main():
         "n_conclusion_flips": flips.groupby("analysis").size(),
         "max_abs_posterior_mean_shift": shift,
     }).fillna(0).astype({"n_conclusion_flips": int})
-    sens.to_csv(RESULTS / "prior_sensitivity.csv")
+    sens.to_csv(RESULTS / f"prior_sensitivity{sfx}.csv")
     log.info("prior sensitivity (global):\n%s", sens.to_string())
 
     # Per-cell sensitivity, conditional on the cell count. For n_rv = 0 the posterior mean is
@@ -101,17 +104,19 @@ def main():
     for prior, alpha in ALPHAS.items():
         cell[f"prior_weight_{prior}"] = V * alpha / (V * alpha + cell["n_region"])
     cell["n_bin"] = pd.cut(cell["n"], [-1, 0, 9, 99, 999, np.inf], labels=["0", "1-9", "10-99", "100-999", ">=1000"])
-    cell.sort_values(["analysis", "n"]).to_csv(RESULTS / "prior_sensitivity_by_cell.csv", index=False)
+    cell.sort_values(["analysis", "n"]).to_csv(RESULTS / f"prior_sensitivity_by_cell{sfx}.csv", index=False)
     by_bin = cell.groupby(["analysis", "n_bin"], observed=True).agg(
         n_cells=("n", "size"),
         median_mean_ratio=("mean_ratio_uniform_over_jeffreys", "median"),
         max_mean_ratio=("mean_ratio_uniform_over_jeffreys", "max"),
         max_mean_abs_diff=("mean_abs_diff", "max"),
         median_cri_hi_ratio=("cri_hi_ratio_uniform_over_jeffreys", "median"))
-    by_bin.to_csv(RESULTS / "prior_sensitivity_by_count.csv")
+    by_bin.to_csv(RESULTS / f"prior_sensitivity_by_count{sfx}.csv")
     log.info("prior sensitivity by cell count (main):\n%s",
              by_bin.loc["main"].to_string() if "main" in by_bin.index.get_level_values(0) else by_bin.to_string())
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--phase", default="ifp", choices=list(PHASES))
+    main(ap.parse_args().phase)

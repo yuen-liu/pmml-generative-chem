@@ -29,10 +29,12 @@ about the mean by sqrt(R), lies above the 97.5% point of the N/R null.
   results/ppc_overdispersion.csv
   results/pairwise_tv_null.csv
 """
+import argparse
+
 import numpy as np
 import pandas as pd
 
-from common import ALPHAS, INTERACTION_TYPES, PROC, REGIONS, RESULTS, SUBPOCKETS, log
+from common import ALPHAS, PHASES, PROC, REGIONS, RESULTS, SUBPOCKETS, log
 
 N_DRAWS = 2_000
 SEED = 1996
@@ -90,9 +92,10 @@ def null_tv(n_a, n_b, n_eff_a, n_eff_b, alpha, rng):
     return out
 
 
-def pairwise_null(pooled, ppc, rng):
+def pairwise_null(pooled, ppc, rng, vocab, sfx):
     """Null baseline and decision rule for every region pair (see module docstring)."""
-    tv = pd.read_csv(RESULTS / "pairwise_tv.csv")
+    INTERACTION_TYPES = vocab
+    tv = pd.read_csv(RESULTS / f"pairwise_tv{sfx}.csv")
     rows = []
     for (analysis, prior), t in tv.groupby(["analysis", "prior"], sort=False):
         r_row = ppc[(ppc.analysis == analysis) & (ppc.prior == prior) & (ppc.region == POOLED)]
@@ -121,7 +124,7 @@ def pairwise_null(pooled, ppc, rng):
                 distinguishable=bool(lo_infl > null_q)))
         log.info("null TV %s/%s done (R = %.2f)", analysis, prior, R)
     out = pd.DataFrame(rows)
-    out.to_csv(RESULTS / "pairwise_tv_null.csv", index=False)
+    out.to_csv(RESULTS / f"pairwise_tv_null{sfx}.csv", index=False)
     m = out[(out.analysis == "main") & (out.prior == "uniform") & out.both_subpockets].sort_values("tv_mean")
     log.info("subpocket pairs, main, alpha = 1 (%d of %d distinguishable):\n%s",
              m.distinguishable.sum(), len(m),
@@ -129,15 +132,18 @@ def pairwise_null(pooled, ppc, rng):
              .round(3).to_string(index=False))
 
 
-def main():
-    pooled = pd.read_csv(PROC / "counts_long.csv")
-    by_kin = pd.read_csv(PROC / "counts_by_kinase_long.csv")
+def main(phase):
+    cfg = PHASES[phase]
+    INTERACTION_TYPES, sfx = cfg["vocab"], cfg["suffix"]
+    pooled = pd.read_csv(PROC / cfg["counts"])
+    by_kin = pd.read_csv(PROC / cfg["by_kinase"])
     fam_of = (pd.read_parquet(PROC / "structures_main.parquet")
               .drop_duplicates("kinase.klifs_name").set_index("kinase.klifs_name")["kinase.family"])
     rng = np.random.default_rng(SEED)
     rows = []
     families = [a for a in pooled["analysis"].unique() if a.startswith("family:")]
-    for analysis in ["main", "full"] + families:
+    base = [a for a in ("main", "full") if a in set(pooled["analysis"])]
+    for analysis in base + families:
         if analysis.startswith("family:"):
             fam = analysis.split(":", 1)[1]
             kin_rows = by_kin[(by_kin.analysis == "main") & by_kin.kinase.map(fam_of).eq(fam)]
@@ -167,13 +173,15 @@ def main():
             rows.append(summarize(analysis, prior, POOLED, tot_obs, tot_rep, max(pooled_kin, default=0), pooled_n))
             log.info("PPC %s/%s done", analysis, prior)
     out = pd.DataFrame(rows)
-    out.to_csv(RESULTS / "ppc_overdispersion.csv", index=False)
+    out.to_csv(RESULTS / f"ppc_overdispersion{sfx}.csv", index=False)
     a = out[(out.analysis == "main") & (out.prior == "uniform")]
     log.info("overdispersion ratio, main, alpha = 1:\n%s",
              a[["region", "n_kinases", "n_obs", "ratio_median", "ratio_cri_lo", "ratio_cri_hi",
                 "approx_cri_width_inflation"]].to_string(index=False))
-    pairwise_null(pooled, out, rng)
+    pairwise_null(pooled, out, rng, INTERACTION_TYPES, sfx)
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--phase", default="ifp", choices=list(PHASES))
+    main(ap.parse_args().phase)
