@@ -1,115 +1,213 @@
-# Writeup plan: one anchor number per step, under Box's loop
+# Writeup plan: eight anchors under Box's loop
 
-Structure follows the course text's three activities (model design, posterior inference, model
-criticism) with revision closing the criticism section. Six anchors; anything that does not
-anchor one is provenance (repo only, cited by file at most). Remap if the course's Figure 1.1
-has more boxes.
+Structure follows the course text's three activities: **in model design we bake our goals and
+assumptions into the model; in posterior inference we solve the algorithmic problem of
+calculating the posterior; in model criticism we ask how the model has succeeded and where it
+has fallen short.** Revision closes criticism.
 
-| Activity | # | Anchor number | Source | Status |
+**Hard cap: eight anchors.** Two pages cannot report both phases symmetrically — that yields two
+thin analyses instead of one argument. Anything that does not serve the flip (anchor 1) or the
+criticism is provenance: repo only, cited by file at most.
+
+**Posterior inference carries no numeric anchor, and that is the point.** Conjugacy trades
+inference difficulty for modelling fidelity, and the bill comes due in criticism (anchors 6-8).
+
+The phase-1-only plan, with the full decision record for the old anchors 3 and 5, is preserved at
+`writeup_plan_phase1.md`.
+
+| Activity | # | Anchor | Source |
+|---|---|---|---|
+| Criticism (lead) | 1 | **The flip.** FP-SE is the least-separated subpocket pair under both measurements, and only the ligand-side one resolves it | `pairwise_tv_null*.csv` |
+| Model design | 2 | One model, fit twice: 7 regions x 7 IFP types = 49 estimands; 7 regions x 4 chemical categories = 28 | design |
+| Model design | 3 | 3,619 of 13,325 human KLIFS structures (27.2%) -> 3,424 ligands -> 10,141 BRICS fragments | `exclusions_*.csv` |
+| Criticism | 4 | **AP is 95.3% aromatic** [0.946, 0.960] - external validation | `posterior_summary_fragments.csv` |
+| Criticism | 5 | Metric dependence: 12.0% (centroid) vs 88.6% (min-atom) near-ties, the two rules agreeing on 54.1% of fragments | `near_ties*.csv` |
+| Criticism | 6 | Overdispersion R = 2.44 [2.31, 2.58] (fragments) and 2.73 [2.62, 2.85] (IFP) -> revision | `ppc_overdispersion*.csv` |
+| Criticism | 7 | Sparse-region power: all five of the fifteen phase-2 pair failures involve B1 (192 fragments) or B2 (299) | `pairwise_tv_null_fragments.csv` |
+| Criticism | 8 | Prior dominance: the n >= 10 cell whose posterior mean moves most between alpha = 1 and 0.5 | `prior_sensitivity_by_cell*.csv` |
+
+## Anchor 1: the flip (the spine)
+
+FP and SE are the hardest pair to separate under both measurements. Only the ligand-side
+measurement separates them. This is the only finding neither phase produces alone.
+
+**Numbers.**
+- Phase 1 (IFP): TV 0.031 [0.025, 0.037], widened lower bound 0.021, null 97.5% 0.023 -> **not
+  distinguishable**. Rank 1 of 15 (smallest TV; median 0.137).
+- Phase 2 (fragments): TV 0.123 [0.098, 0.148], widened lower bound 0.084, null 97.5% 0.060 ->
+  **distinguishable**. Rank 2 of 15 (median 0.221).
+- Same verdicts at alpha = 0.5.
+
+**What separates them (settled before the sentence was written).** No single category drives it;
+two do, in opposition, carrying 75.5% of the TV between them:
+
+| Category | FP | SE | diff (95% CrI) | share of TV |
 |---|---|---|---|---|
-| Model design | 1 | 49 estimands: 7 regions (6 KinFragLib subpockets + `other` reference) x 7 IFP interaction types | design | fixed |
-| Model design | 2 | 3,635 of 13,325 human KLIFS structures (27%) survive the scope filters + (kinase, ligand) dedup | `exclusions_*.csv` | **3,619 of 13,325 (27.2%)** after 16 assignment drops |
-| Posterior inference | 3 | pairwise subpocket distinguishability vs a same-profile null at N/R (all six subpockets: all have prior share < 1%) | `pairwise_tv_null.csv` | **14 of 15 subpocket pairs distinguishable; FP-SE is not: TV 0.031, widened lower bound 0.021 vs N/R null 0.023** (same verdict at alpha = 0.5) |
-| Model criticism | 4 | share of per-structure residue assignments within 1 A of the runner-up centre | `near_ties.csv` | **25.4%** of subpocket-labelled assignments (51,804 / 203,858); 21 unstable positions |
-| Model criticism | 5 | the n >= 10 cell whose posterior mean moves most between alpha = 1 and 0.5 | `prior_sensitivity_by_cell.csv` | main max shift 0.001 (< 0.01), so taken from a family subset: **JakA, B1 x apolar, n = 22, N_r = 24: 0.742 -> 0.818**, prior share 0.23 |
-| Model criticism | 6 | posterior predictive overdispersion ratio R across kinases, pooled over the six subpockets (main, alpha = 1), with 95% interval -> revision | `ppc_overdispersion.csv` | **R = 2.73 [2.62, 2.85]**, CrIs ~1.65x too narrow; full (no dedup) set R = 5.57 |
+| Aromatic | 0.459 | 0.556 | -0.097 [-0.126, -0.068] | 39.3% |
+| Polar, non-aromatic | 0.235 | 0.146 | +0.089 [+0.066, +0.111] | 36.2% |
+| Aliphatic | 0.080 | 0.046 | +0.034 [+0.020, +0.048] | 13.8% |
+| Charged | 0.226 | 0.252 | -0.026 [-0.051, -0.001] | 10.7% |
 
-## Anchor 5: definition fixed before the full run
+State it as an aromatic-for-polar **substitution** at matched charged content: FP trades aromatic
+rings for polar non-aromatic groups relative to SE. Do **not** attribute the difference to charge
+- the charged shares are nearly equal (0.226 vs 0.252) and that CrI's upper bound is -0.0013.
+Charged separates FP and SE *together* from AP (0.017), which is a different claim.
 
-The test-run example (B1, N_r = 10, all apolar, posterior mean 0.647 -> 0.778) came from 142
-AGC-only structures and will probably not survive the full run. Defined now:
-- Anchor 5 = the `main`-analysis cell with n >= 10 and the largest |posterior-mean shift| between priors.
-- If no main cell shifts by more than 0.01, take it from the family subsets (smaller N_r), and
-  say it is a subset.
-- If no cell shifts anywhere, anchor 5 becomes "the count threshold happens to suffice here", and
-  the paragraph shrinks to the prior-share statistic plus the zero-count limit.
+**The defence: the flip runs against the power gradient.** Phase 1 had 3.3x more observations on
+this exact pair (FP 6,448 + SE 8,659 = 15,107) than phase 2 (2,640 + 1,981 = 4,621), and still
+found no difference, while phase 2 found one with less. A power artefact would run the other way.
+Use the per-pair ratio, not the global one (68,493 vs 10,141 observations); the per-pair figure is
+the one the argument needs. Normalised against each phase's own null - the only scale-free
+comparison available, since the two vocabularies put TV on different scales (phase 2's median
+pairwise TV is 1.6x phase 1's) - TV/null is 1.32 in phase 1 against 2.05 in phase 2.
 
-Paragraph order: (a) a cell that passes the n >= 10 threshold yet moves with the prior;
-(b) why: with V = 7 the prior adds 7 alpha of mass however the data concentrate,
-posterior mean (alpha + n)/(7 alpha + N_r) when all mass is in one type; (c) the statistic that
-captures it, prior share 7 alpha/(7 alpha + N_r), with the n < 10 flag secondary; (d) the
-zero-count cell as the limit (uniform / Jeffreys ratio -> 2; 1.98 observed); (e) why the
-main result holds: anchor 3 rests only on well-populated regions, whose prior share is
-negligible. Do NOT claim every reported cell clears the threshold: the zero-count charge
-cells appear in the figure and tables.
+**Caution, one clause, mandatory.** The two phases use different observation units and different
+nulls, so the dissociation is **between measurements, not a proven fact about the pocket**.
 
-## What the other anchors carry
+**Also disclose, one clause.** Phase 1's undeduplicated set *does* find FP-SE distinguishable
+(0.025 widened vs 0.021 null). Its effect size is essentially unchanged (0.034 vs 0.031); it
+passes only because the null shrinks with N. Pseudo-replication passing a test the main set
+fails is consistent with the spine, but it is in `pairwise_tv_null.csv` and should be disclosed
+rather than left to be found.
 
-1. Defines the estimand, and states that `other` is a reference mixture, not a seventh subpocket.
-2. One funnel number. Scope filters are design assumptions; rules are named in one sentence.
-3. If even the closest pair of well-populated subpockets has a CrI clear of zero, all are
-   distinct; if not, that pair is the result. TV is biased upward at small N, which is
-   negligible for well-populated regions.
-4. The partition is not well defined at residue level, so phase 1 answers the weaker question
-   ("residues nearest different cavity centres"). Phase 2 asks the real one.
-6. The model check. R = observed / replicated multinomial deviance of per-kinase counts,
-   per posterior draw (realized discrepancy; deviance, not Pearson, because of near-zero
-   cells). Calibrated on simulated data: 0.95 [0.88, 1.04] when the model holds; 3.7 and 18
-   under mild and strong kinase-level variation. Reading: the step-3 intervals are too narrow by
-   roughly sqrt(R) (quasi-likelihood approximation; say so). That is the cost of conjugate
-   inference showing up in criticism, and it motivates the revision: kinase-level profiles
-   partially pooled toward a global subpocket profile. Kinases-for-50% of observations
-   (`kinase_counts.csv`) is supporting detail here. No tail probability is reported.
+**What the headline is NOT.** Not "subpockets have distinct chemical preferences" - that is the
+background result (14 of 15 pairs in phase 1, 10 of 15 in phase 2) and it goes in one sentence.
 
-## Figure
+## Anchor 2: one model, fit twice
 
-Fig. 1 (two panels) serves anchors 1 and 3: (a) the posterior TV matrix between region
-profiles; (b) interaction-type profiles with 95% CrI for the four subpockets with the most
-main-set observations (rule fixed before the full numbers), against the `other` reference band.
+The Dirichlet-Categorical model is stated once and fit to two observation units: protein-side
+interaction types (phase 1) and ligand-side fragment chemistry (phase 2). Describing it twice
+costs almost nothing, which is the economy that makes anchor 1 affordable.
+
+    observation in region r ~ Categorical(pi_r),  pi_r ~ Dirichlet(alpha * 1)
+    =>  pi_r | data ~ Dirichlet(alpha + n_r)
+
+Assumptions carry over unchanged: regions independent, observations exchangeable within a region
+(violated across kinases - anchor 6), `other` a reference mixture rather than a seventh subpocket.
+
+**Disclose the category-definition revision as a specification fix, not post-hoc tuning.** The
+first ordering (charged -> hbond -> aromatic -> aliphatic) sent every N-heterocycle to `hbond`:
+pyridine, pyrimidine, imidazole, aminopyrimidine - the core hinge-binding chemistry of the whole
+dataset. Reordered to charged -> aromatic -> hbond -> aliphatic. The test applied: would the
+change be made if the shares were even? Yes - it is a validity error, independent of outcome.
+Category count was never expanded.
+
+## Anchor 3: scope
+
+One funnel sentence. 13,325 human KLIFS structures -> 3,619 after the scope filters (non-human,
+atypical kinase, DFG not in, no orthosteric ligand, missing/empty IFP, substrate-like ligand) and
+(kinase, ligand) deduplication -> 3,424 parsable ligands -> 10,141 BRICS fragments after the
+small-fragment merge. Scope filters are design assumptions, named in one sentence. Every drop is
+logged with its rule in `exclusions_*.csv`; nothing is silently dropped.
+
+Phase 2 exclusions: 139 oversized BRICS fragments (>22 heavy atoms, KinFragLib's rule), 56
+unparsable ligands, 14 missing anchor residues, 2 unavailable.
+
+## Anchor 4: AP is 95.3% aromatic (external validation)
+
+Posterior mean 0.953 [0.946, 0.960] over 3,322 fragments. The adenine pocket is where
+hinge-binding heteroaromatics sit - this is what medicinal chemistry says should be there, and it
+was not fit to. It is external evidence that the pipeline measures something real, which is worth
+more than most numbers competing for this space. Contrast: AP's charged share is 0.017 against
+0.226 (FP) and 0.252 (SE), the solubilising groups at the solvent front.
+
+## Anchor 5: metric dependence
+
+The subpocket partition is partly an artefact of the distance rule used to define it.
+
+- Phase 2, centroid-to-centre: **12.0%** of fragment assignments within 1 A of the runner-up centre.
+- Phase 2, the spec's minimum atom-to-residue rule: **88.6%**.
+- The two rules agree on only **54.1%** of fragments.
+- Phase 1, residue level: 25.4% near-ties (51,804 / 203,858), 21 unstable positions.
+
+Stronger than phase 1's 25.4% on its own, and it is the argument for the larger project: if the
+partition is this sensitive to an arbitrary geometric choice, subpockets are better treated as
+latent variables to be learned than as a fixed labelling to condition on.
+
+## Anchor 6: overdispersion -> revision
+
+R = observed / replicated multinomial deviance of per-kinase counts, per posterior draw (realized
+discrepancy, Gelman-Meng-Stern; deviance rather than Pearson because of near-zero cells).
+
+- Fragments: **R = 2.44 [2.31, 2.58]** -> CrIs roughly 1.56x too narrow.
+- IFP: **R = 2.73 [2.62, 2.85]** -> roughly 1.65x too narrow. Undeduplicated set 5.57.
+- Calibration on simulated data: 0.95 [0.88, 1.04] when the model holds; 3.7 and 18 under mild
+  and strong kinase-level variation.
+
+Say explicitly that sqrt(R) as an interval inflation factor, and N/R as an effective sample size,
+are **quasi-likelihood approximations, not derivations**. Both phases exceed the
+model-holds range in the same direction and by a similar amount, so the misfit is a property of
+the model rather than of either observation unit. Supporting detail: 17 of 227 kinases hold 50% of
+IFP observations; 17 of 214 hold 50% of fragments.
+
+**Revision (unchanged):** kinase-level profiles partially pooled toward a global subpocket
+profile. This is where conjugacy's bill comes due - the revision has no closed form and needs MCMC
+or variational inference, which is exactly the trade the inference section describes. No tail
+probability is reported.
+
+## Anchor 7: sparse-region power
+
+Phase 2 distinguishes 10 of 15 subpocket pairs against 14 of 15 in phase 1. **All five failures
+involve B1 (192 fragments) or B2 (299)**: GA-B1, SE-B2, FP-B2, GA-B2, B1-B2. Every pair involving
+AP or FP separates. So the weaker phase-2 result is a power limit in two sparse regions, not an
+absence of signal - and the sparsity is traceable to a design decision, the DFG-in filter, which
+excludes the structures whose ligands reach the back pocket. Identical verdicts at alpha = 0.5.
+
+This is the honest reading of the 10-vs-14 drop and it belongs here rather than being left to
+look like a contradiction of anchor 1.
+
+## Anchor 8: prior dominance
+
+A cell can clear the n >= 10 flag and still move with the prior if its region's total N_r is
+small. The statistic that captures this is the prior's share of posterior concentration,
+V*alpha / (V*alpha + N_r); the n < 10 count flag is secondary.
+
+Paragraph order: (a) a cell that passes the n >= 10 threshold yet moves with the prior; (b) why -
+with V categories the prior adds V*alpha of mass however the data concentrate; (c) the prior-share
+statistic; (d) the zero-count cell as the limit (uniform/Jeffreys posterior-mean ratio -> 2, 1.998
+observed); (e) why anchor 1 holds regardless - FP and SE both have prior share < 1%.
+
+Do **not** claim every reported cell clears the threshold: zero-count cells appear in the figures
+and tables.
+
+## Figures
+
+**Fig. 1 - the flip. Two panels, one pair, two measurements.** Panel (a) phase 1 (IFP
+interactions), panel (b) phase 2 (fragment chemistry). Each panel, on a TV axis:
+
+1. The FP-SE posterior TV: point at the mean, solid bar for the 95% CrI, lighter extension to the
+   sqrt(R)-widened interval, so the overdispersion correction is visible rather than asserted.
+2. The null: simulated same-profile TV at N/R as a filled density, with its 97.5% point as a
+   vertical rule spanning the panel. The verdict reads off as "does the widened bar clear the
+   rule": 0.084 vs 0.060 clears; 0.021 vs 0.023 does not.
+3. A context strip along the top: the other 14 pair TVs as grey ticks, so the figure is honest
+   that FP-SE is rank 1 and rank 2 of 15.
+
+Independent x-axes per panel (phase 1 ~[0, 0.25], phase 2 ~[0, 0.5]).
+**Caption must state that the two panels use different vocabularies and that the axes are not
+comparable** - the panels otherwise invite direct comparison. The same note belongs on the
+secondary figures, whose panel (b) is log-scaled for IFP and linear for fragments.
+
+Optional panel (c): the four per-category FP-SE differences as dots with CrIs - the anchor 1 table
+plotted. Include if Fig. 1 gets a half page; otherwise it moves to the secondary figure.
+
+**Figs. S1/S2 (secondary, demoted from primary):** the existing two-panel per-phase figures - TV
+matrix across all 7 regions, and interaction/category profiles with CrIs for the four
+best-populated subpockets against the `other` reference band. These serve anchors 2, 4 and 7 and
+are no longer the lead.
 
 ## Provenance only (repo, not prose)
 
 - Exclusion counts per rule; the 27 kept-with-flag structures
-- 85-position lookup table, modal shares, unstable positions (`results/subpocket_map.md`)
-- Closest-atom vs centroid choice (10% vs 20% of bits in `other`): one clause under anchor 4
-- Pairwise per-type differences (`pairwise_diffs.csv`)
+- 85-position lookup table, modal shares, 21 unstable positions (`results/subpocket_map.md`)
+- Closest-atom vs centroid residue rule (10% vs 20% of bits in `other`): one clause under anchor 5
+- Small-fragment merge accounting: 46.8% of BRICS fragments tiny, 8.0% relabelled, holding 2.5%
+  of heavy atoms - the merge moved very little chemistry. One clause if space allows.
+- Pairwise per-type differences for pairs other than FP-SE (`pairwise_diffs*.csv`)
 - Sensitivity analyses: per-structure labels, full (no dedup) set, top-3 families, alpha = 0.5
-  (one clause under anchor 6 says whether any changes anchor 3)
-- DFG-in filter and B1 sparsity, covalent gap, substrate rule (bullets in criticism notes)
-
-## Full-run notes (2026-10-17)
-
-- Kinases for 50% of main observations: 17 of 227 (CDK2 alone 9.8%). Supporting detail for anchor 6.
-- Dedup DID work, but the evidence is the PPC, not B1's share: R = 5.57 (full) vs 2.73 (main).
-  B1's share is 3.1% in both main and full, so there is no B1 drop.
-- Zero-count cells in main: 6; uniform / Jeffreys mean ratio 1.997-1.9998 (the limit, 2).
-- Anchor 3 issue: TV > 0 by construction, so "CrI clear of zero" tests nothing. Null baseline
-  (two regions sharing one pooled profile, same N): FP-SE observed 0.031 [0.025, 0.037] vs null
-  97.5% 0.013 (naive) / 0.023 (at N/R). AP-B2 0.073 vs 0.016 / 0.027.
-- The figure rule's top four are AP, GA, SE, B2. FP (6,448) missed B2 (6,749) by 301
-  observations, and FP-SE is the closest subpocket pair overall.
-
-## Anchor 3 (decided 2026-10-17)
-
-Population: all six subpockets. The prior-share rule decides it (every subpocket's prior share is
-< 1%). The figure's "top four" is a display choice, not the anchor population.
-
-Rule (in `06b_posterior_predictive.py`, fixed before pairwise results were inspected): a pair is
-distinguishable if the lower end of its 95% CrI, widened about the mean by sqrt(R), lies above
-the 97.5% point of the null TV for two regions sharing the pair's pooled profile, simulated at
-N/R. Say in one clause that N/R as an effective sample size is an approximation (quasi-likelihood).
-
-Result: 14 of 15 pairs distinguishable under both priors. FP-SE is not: TV 0.031 [0.025, 0.037],
-widened lower bound 0.021 vs null 0.023 (alpha = 1) / 0.024 (alpha = 0.5); 1,000 null replicates.
-The margin is narrow. At 200 replicates the Jeffreys run passed, which was Monte Carlo noise.
-Undeduplicated set: FP-SE passes (0.025 vs 0.021); it has more observations, even after dividing by the larger R.
-
-Families (state as separate observations, NOT corroboration): with 10-30x fewer observations,
-FP-SE is not distinguishable in MAPK or JakA but is in CDK. Those subsets fail several other pairs
-too (MAPK: FP-SE, FP-GA, FP-B1, SE-GA; JakA: 10 of 15), so they are underpowered and don't single
-FP-SE out. Drop the earlier "within MAPK, SE-GA is similarly marginal" line: under the formal rule
-MAPK fails FP-SE itself, plus three others.
-
-External check (qualitative): in KinFragLib's own fragment statistics, FP and SE have the two
-lowest median fragment logP of the six subpockets (v1.0.0: FP 0.73, SE 0.99; next lowest B1 1.16;
-`notebooks/2_2_fragment_analysis_statistics.ipynb`, cell 126; current master: 0.78, 1.01).
-Caveats to state: (i) a different quantity on different objects (fragment lipophilicity vs residue
-IFP types), so it supports SIMILARITY of FP and SE only, not the direction of any difference;
-(ii) medians with SD ~1.2-1.3, no intervals; (iii) looked up after the FP-SE result, so it is a
-post-hoc plausibility check. Our profiles agree on similarity: apolar share 0.895 (FP) vs 0.893 (SE).
-They are not identical: SE has protein-anion : ligand-cation contacts at 0.017 vs 0.001 in FP
-(consistent with basic solubilising groups at the solvent front).
-
-Headline: all subpocket pairs are distinguishable except FP-SE, which fails narrowly once
-overdispersion is accounted for, and FP and SE are also the two subpockets whose fragments
-KinFragLib found least lipophilic.
+- Family subsets: with 10-30x fewer observations they fail many pairs and corroborate nothing;
+  state as separate observations, not support
+- KinFragLib's lowest-median-logP check on FP/SE: a post-hoc qualitative plausibility note on
+  similarity only, not direction. Now largely superseded by anchor 1's own decomposition.
+- DFG-in filter and B1/B2 sparsity (anchor 7 carries the one-sentence version), covalent gap,
+  substrate rule
